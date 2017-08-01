@@ -63,7 +63,6 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
   private String project;
   private Serializer<K> keySerializer;
   private Serializer<V> valueSerializer;
-  private PublisherFutureStub publisher;
   private ProducerConfig producerConfig;
   private AtomicBoolean lock;
   private AtomicBoolean closed;
@@ -102,7 +101,6 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
       this.producerConfig = configs;
       this.requests = Collections.synchronizedSet(new HashSet<ListenableFuture<PublishResponse>>());
 
-      this.publisher = ChannelUtil.getFutureStub();
       this.topic = configs.getString(ProducerConfig.TOPIC_CONFIG);
       this.project = configs.getString(ProducerConfig.PROJECT_CONFIG);
 
@@ -177,7 +175,8 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
         .build();
 
     PublishRequest request = PublishRequest.newBuilder()
-        .setTopic(ChannelUtil.PROJECT_PREFIX + project + "/" + ChannelUtil.TOPIC_PREFIX + topic)
+        .setTopic(ChannelUtil.instance.PROJECT_PREFIX + project +
+            "/" + ChannelUtil.instance.TOPIC_PREFIX + topic)
         .addMessages(msg)
         .build();
 
@@ -185,7 +184,8 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
         , 0L, 0L, System.currentTimeMillis()
         , 0L, keyBytes.length, valueBytes.length);
 
-    final ListenableFuture<PublishResponse> response = publisher.publish(request);
+    final ListenableFuture<PublishResponse> response =
+        ChannelUtil.instance.getFutureStub().publish(request);
 
     requests.add(response);
 
@@ -202,7 +202,6 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
         requests.remove(response);
         if (callback != null)
           callback.onCompletion(recordMetadata, new ExecutionException(throwable));
-        System.out.println("FAILURE");
       }
     });
 
@@ -256,4 +255,5 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
       System.out.println("Couldn't close the producer.");
     }
   }
+
 }

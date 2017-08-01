@@ -32,49 +32,41 @@ import com.google.auth.oauth2.GoogleCredentials;
  */
 public class ChannelUtil {
 
-  private ChannelUtil() {}
-  private static ManagedChannel channel;
-  private static CallCredentials credentials;
+  public final String ENDPOINT;
+  public final String TOPIC_PREFIX;
+  public final String PROJECT_PREFIX;
 
-  private static final String ENDPOINT;
-  public static final String TOPIC_PREFIX;
-  public static final String PROJECT_PREFIX;
+  private ManagedChannel channel;
+  private CallCredentials credentials;
 
-  static {
+  public static ChannelUtil instance = new ChannelUtil();
+
+  private ChannelUtil() {
     TOPIC_PREFIX = "topics/";
     PROJECT_PREFIX = "projects/";
     ENDPOINT = "pubsub.googleapis.com";
+
     channel = ManagedChannelBuilder.forTarget(ENDPOINT).build();
     try {
       credentials = MoreCallCredentials.from(GoogleCredentials.getApplicationDefault());
     } catch (Exception exception) {
-      System.out.println("COULDN'T RETRIEVE CREDENTIALS");
+      System.out.println("Couldn't retrieve credentials!");
     }
   }
 
-  private static void reinitializeChannel() { channel = ManagedChannelBuilder.forTarget(ENDPOINT).build(); }
+  public void reinitializeChannel() {
+    channel = ManagedChannelBuilder.forTarget(ENDPOINT).build();
+  }
 
-  public static PublisherStub getAsyncStub() {
-    if (isChannelDown())
-      reinitializeChannel();
+  public PublisherStub getAsyncStub() {
     return PublisherGrpc.newStub(channel).withCallCredentials(credentials);
   }
 
-  public static PublisherBlockingStub getBlockingStub() {
-    if (isChannelDown())
-      reinitializeChannel();
-    return PublisherGrpc.newBlockingStub(channel).withCallCredentials(credentials);
-  }
-
-  public static PublisherFutureStub getFutureStub() {
-    if (isChannelDown())
-      reinitializeChannel();
+  public PublisherFutureStub getFutureStub() {
     return PublisherGrpc.newFutureStub(channel).withCallCredentials(credentials);
   }
 
-  public static void closeChannel() { channel.shutdown(); }
-
-  public static void closeChannelNow() { channel.shutdownNow(); }
-
-  public static boolean isChannelDown() { return channel.isShutdown(); }
+  public PublisherBlockingStub getBlockingStub() {
+    return PublisherGrpc.newBlockingStub(channel).withCallCredentials(credentials);
+  }
 }

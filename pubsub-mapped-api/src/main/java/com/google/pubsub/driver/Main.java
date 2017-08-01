@@ -43,15 +43,22 @@ public class Main {
     new Thread(new Runnable() {
       @Override
       public void run() {
-        producer.flush();
+        for (int i = 10; i < 20; i++) {
+          producer.send(new ProducerRecord<>(
+              "wow", 0, Integer.toString(i), "msg" + Integer.toString(i)));
+          System.out.println(i);
+        }
       }
     }).start();
 
-    for (int i = 10; i < 20; i++) {
-      producer.send(new ProducerRecord<>(
-          "wow", 0, Integer.toString(i), "msg" + Integer.toString(i)));
-      System.out.println(i);
-    }
+    producer.flush();
+
+    new Thread(new Runnable() {
+      @Override
+      public void run() {
+        while (true);
+      }
+    }).start();
 
   }
 }
