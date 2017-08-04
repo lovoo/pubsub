@@ -59,6 +59,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class KafkaProducer<K, V> implements Producer<K, V> {
 
+  private final String TOPIC_PREFIX = "topics/";
+  private final String PROJECT_PREFIX = "projects/";
+
+  private PublisherFutureStub publisher;
+  private ChannelUtil channelUtil = ChannelUtil.instance;
+  private Set<ListenableFuture<PublishResponse>> requests;
+
   private String topic;
   private String project;
   private Serializer<K> keySerializer;
@@ -66,7 +73,6 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
   private ProducerConfig producerConfig;
   private AtomicBoolean lock;
   private AtomicBoolean closed;
-  private Set<ListenableFuture<PublishResponse>> requests;
 
   private long lingerMs;
   private boolean isAcks;
@@ -136,12 +142,24 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
     }
   }
 
+  //TODO: Remove after Testing.
+
+  public KafkaProducer(ProducerConfig configs, Serializer<K> keySerializer,
+      Serializer<V> valueSerializer, ChannelUtil util) {
+    this(configs, keySerializer, valueSerializer);
+
+    channelUtil = util;
+    publisher = util.getFutureStub();
+  }
+
   /**
    * Sends the given record.
    */
   public Future<RecordMetadata> send(ProducerRecord<K, V> record) {
     return send(record, null);
   }
+
+  //TODO: Introduce deadline, retries, batching and linger.
 
   /**
    * Sends the given record and invokes the specified callback.
@@ -155,6 +173,9 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 
     if (!topic.equals(record.topic()))
       throw new RuntimeException("Topic doesn't match the pre-assigned one.");
+
+    if (publisher == null)
+      publisher = channelUtil.getFutureStub();
 
     Map<String, String> attributes = new HashMap<>();
 
@@ -175,8 +196,8 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
         .build();
 
     PublishRequest request = PublishRequest.newBuilder()
-        .setTopic(ChannelUtil.instance.PROJECT_PREFIX + project +
-            "/" + ChannelUtil.instance.TOPIC_PREFIX + topic)
+        .setTopic(PROJECT_PREFIX + project +
+            "/" + TOPIC_PREFIX + topic)
         .addMessages(msg)
         .build();
 
@@ -184,8 +205,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
         , 0L, 0L, System.currentTimeMillis()
         , 0L, keyBytes.length, valueBytes.length);
 
-    final ListenableFuture<PublishResponse> response =
-        ChannelUtil.instance.getFutureStub().publish(request);
+    final ListenableFuture<PublishResponse> response = publisher.publish(request);
 
     requests.add(response);
 
@@ -238,6 +258,8 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
    */
   public void close() { close(0, null); }
 
+  //TODO: Handle the timeout part.
+
   /**
    * Closes the producer with the given timeout.
    */
@@ -248,12 +270,8 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
     if (closed.getAndSet(true))
       throw new IllegalStateException("Producer already closed.");
 
-    try {
-      flush();
-    } catch (Exception e) {
-      closed.set(false);
-      System.out.println("Couldn't close the producer.");
-    }
+    flush();
+    keySerializer.close();
+    valueSerializer.close();
   }
-
 }

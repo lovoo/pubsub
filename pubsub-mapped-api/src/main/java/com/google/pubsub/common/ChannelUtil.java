@@ -33,8 +33,6 @@ import com.google.auth.oauth2.GoogleCredentials;
 public class ChannelUtil {
 
   public final String ENDPOINT;
-  public final String TOPIC_PREFIX;
-  public final String PROJECT_PREFIX;
 
   private ManagedChannel channel;
   private CallCredentials credentials;
@@ -42,8 +40,6 @@ public class ChannelUtil {
   public static ChannelUtil instance = new ChannelUtil();
 
   private ChannelUtil() {
-    TOPIC_PREFIX = "topics/";
-    PROJECT_PREFIX = "projects/";
     ENDPOINT = "pubsub.googleapis.com";
 
     channel = ManagedChannelBuilder.forTarget(ENDPOINT).build();

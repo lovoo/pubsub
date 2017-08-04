@@ -51,14 +51,14 @@ public class Main {
       }
     }).start();
 
-    producer.flush();
-
     new Thread(new Runnable() {
       @Override
       public void run() {
-        while (true);
+        try {
+          Thread.sleep(1000);
+        } catch (InterruptedException e) {}
+        producer.flush();
       }
     }).start();
-
   }
 }
