@@ -56,6 +56,7 @@ public class CloudPubSubSourceTask extends SourceTask {
   private String kafkaTopic;
   private String cpsSubscription;
   private String kafkaMessageKeyAttribute;
+  private String kafkaMessageTimestampAttribute;
   private int kafkaPartitions;
   private PartitionScheme kafkaPartitionScheme;
   private int cpsMaxBatchSize;
@@ -92,6 +93,8 @@ public class CloudPubSubSourceTask extends SourceTask {
         (Integer) validatedProps.get(CloudPubSubSourceConnector.KAFKA_PARTITIONS_CONFIG);
     kafkaMessageKeyAttribute =
         (String) validatedProps.get(CloudPubSubSourceConnector.KAFKA_MESSAGE_KEY_CONFIG);
+    kafkaMessageTimestampAttribute = (String) validatedProps
+				.get(CloudPubSubSourceConnector.KAFKA_MESSAGE_TIMESTAMP_CONFIG);
     kafkaPartitionScheme =
         PartitionScheme.getEnum(
             (String) validatedProps.get(CloudPubSubSourceConnector.KAFKA_PARTITION_SCHEME_CONFIG));
@@ -100,6 +103,24 @@ public class CloudPubSubSourceTask extends SourceTask {
       subscriber = new CloudPubSubRoundRobinSubscriber(NUM_CPS_SUBSCRIBERS);
     }
     log.info("Started a CloudPubSubSourceTask.");
+  }
+
+  /**
+   * Attempts to receive the timestamp attribute from the message. Returns null
+   * if there is no timestamp or the timestamp is malformed
+   */
+  private Long parseMessageTimestampOrNull(Map<String, String> messageAttributes) {
+    String timestampAttribute = messageAttributes.get(kafkaMessageTimestampAttribute);
+    if (timestampAttribute == null || timestampAttribute.isEmpty()) {
+
+      return null;
+    }
+    try {
+      return Long.parseLong(timestampAttribute);
+    } catch (NumberFormatException e) {
+      log.debug(String.format("Timestamp attribute was malformed: %s", e.getMessage()));
+    }
+    return null;
   }
 
   @Override
@@ -127,11 +148,14 @@ public class CloudPubSubSourceTask extends SourceTask {
         ackIds.add(ackId);
         Map<String, String> messageAttributes = message.getAttributes();
         String key = messageAttributes.get(kafkaMessageKeyAttribute);
+        Long timestamp = parseMessageTimestampOrNull(messageAttributes);
         ByteString messageData = message.getData();
         byte[] messageBytes = messageData.toByteArray();
-
-        boolean hasAttributes =
-            messageAttributes.size() > 1 || (messageAttributes.size() > 0 && key == null);
+        
+        // check if we have attributes apart from the kafka message key/timestamp
+        boolean hasAttributes = messageAttributes.size()
+            - (messageAttributes.containsKey(kafkaMessageKeyAttribute) ? 1 : 0)
+            - (messageAttributes.containsKey(kafkaMessageTimestampAttribute) ? 1 : 0) > 0;
 
         SourceRecord record = null;
         if (hasAttributes) {
@@ -141,7 +165,8 @@ public class CloudPubSubSourceTask extends SourceTask {
 
           for (Entry<String, String> attribute :
                messageAttributes.entrySet()) {
-            if (!attribute.getKey().equals(kafkaMessageKeyAttribute)) {
+            if (!attribute.getKey().equals(kafkaMessageKeyAttribute) 
+            		&& !attribute.getKey().equals(kafkaMessageTimestampAttribute)) {
               valueSchemaBuilder.field(attribute.getKey(),
                                        Schema.STRING_SCHEMA);
             }
@@ -167,7 +192,8 @@ public class CloudPubSubSourceTask extends SourceTask {
                 Schema.OPTIONAL_STRING_SCHEMA,
                 key,
                 valueSchema,
-                value);
+                value,
+                timestamp);
         } else {
           record =
             new SourceRecord(
@@ -178,7 +204,8 @@ public class CloudPubSubSourceTask extends SourceTask {
                 Schema.OPTIONAL_STRING_SCHEMA,
                 key,
                 Schema.BYTES_SCHEMA,
-                messageBytes);
+                messageBytes,
+                timestamp);
         }
         sourceRecords.add(record);
       }
