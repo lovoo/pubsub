@@ -34,7 +34,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
+
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
@@ -60,12 +63,13 @@ public class CloudPubSubSourceTask extends SourceTask {
   private int kafkaPartitions;
   private PartitionScheme kafkaPartitionScheme;
   private int cpsMaxBatchSize;
+  private double messageSampling;
   // Keeps track of the current partition to publish to if the partition scheme is round robin.
   private int currentRoundRobinPartition = -1;
   // Keep track of all ack ids that have not been sent correctly acked yet.
   private Set<String> ackIds = Collections.synchronizedSet(new HashSet<String>());
   private CloudPubSubSubscriber subscriber;
-
+  
   public CloudPubSubSourceTask() {}
 
   @VisibleForTesting
@@ -98,6 +102,7 @@ public class CloudPubSubSourceTask extends SourceTask {
     kafkaPartitionScheme =
         PartitionScheme.getEnum(
             (String) validatedProps.get(CloudPubSubSourceConnector.KAFKA_PARTITION_SCHEME_CONFIG));
+    messageSampling = ((Double) validatedProps.get(CloudPubSubSourceConnector.KAFKA_MESSAGE_SAMPLING_CONFIG)).doubleValue();
     if (subscriber == null) {
       // Only do this if we did not set through the constructor.
       subscriber = new CloudPubSubRoundRobinSubscriber(NUM_CPS_SUBSCRIBERS);
@@ -146,6 +151,12 @@ public class CloudPubSubSourceTask extends SourceTask {
           continue;
         }
         ackIds.add(ackId);
+        
+        // ignore the message if sampling is activated and the sampling-probability is lower than the next random
+        if(this.messageSampling != 1d && this.messageSampling < ThreadLocalRandom.current().nextDouble()){
+          continue;
+        }
+        
         Map<String, String> messageAttributes = message.getAttributes();
         String key = messageAttributes.get(kafkaMessageKeyAttribute);
         Long timestamp = parseMessageTimestampOrNull(messageAttributes);

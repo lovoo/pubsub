@@ -48,6 +48,7 @@ public class CloudPubSubSourceConnector extends SourceConnector {
   public static final String KAFKA_MESSAGE_KEY_CONFIG = "kafka.key.attribute";
   public static final String KAFKA_MESSAGE_TIMESTAMP_CONFIG = "kafka.timestamp.attribute";
   public static final String KAFKA_TOPIC_CONFIG = "kafka.topic";
+  public static final String KAFKA_MESSAGE_SAMPLING_CONFIG = "kafka.message.sampling";
   public static final String CPS_SUBSCRIPTION_CONFIG = "cps.subscription";
   public static final String CPS_MAX_BATCH_SIZE_CONFIG = "cps.maxBatchSize";
   public static final int DEFAULT_CPS_MAX_BATCH_SIZE = 100;
@@ -186,7 +187,15 @@ public class CloudPubSubSourceConnector extends SourceConnector {
             DEFAULT_KAFKA_PARTITION_SCHEME,
             new PartitionScheme.Validator(),
             Importance.MEDIUM,
-            "The scheme for assigning a message to a partition in Kafka.");
+            "The scheme for assigning a message to a partition in Kafka.")
+        .define(
+            KAFKA_MESSAGE_SAMPLING_CONFIG,
+            Type.DOUBLE,
+            1d,
+            ConfigDef.Range.between(0D, 1D),
+            Importance.LOW,
+            "Sampling value to send only a fraction of messages to Kafka.");
+    
   }
 
   /**

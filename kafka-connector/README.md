@@ -78,6 +78,7 @@ Connector supports the following configs:
 | cps.maxBatchSize | Integer | 100 | The minimum number of messages to batch per pull request to Cloud Pub/Sub. |
 | kafka.key.attribute | String | null | The Cloud Pub/Sub message attribute to use as a key for messages published to Kafka. |
 | kafka.timestamp.attribute | String | null | The Cloud Pub/Sub message attribute to use as a timestamp for messages published to Kafka. |
+| kafka. | Double | 1.0 | Sampling value to send only a fraction of messages to Kafka. From 0..1. |
 | kafka.partition.count | Integer | 1 | The number of Kafka partitions for the Kafka topic in which messages will be published to. |
 | kafka.partition.scheme | round_robin, hash_key, hash_value | round_robin | The scheme for assigning a message to a partition in Kafka. The scheme "round_robin" assigns partitions in a round robin fashion, while the schemes "hash_key" and "hash_value" find the partition by hashing the message key and message value respectively. |
 

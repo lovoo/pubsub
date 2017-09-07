@@ -17,6 +17,7 @@ package com.google.pubsub.kafka.source;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
@@ -34,6 +35,7 @@ import com.google.pubsub.v1.AcknowledgeRequest;
 import com.google.pubsub.v1.PubsubMessage;
 import com.google.pubsub.v1.PullRequest;
 import com.google.pubsub.v1.PullResponse;
+import com.google.pubsub.v1.PullResponse.Builder;
 import com.google.pubsub.v1.ReceivedMessage;
 import java.util.HashMap;
 import java.util.List;
@@ -198,6 +200,54 @@ public class CloudPubSubSourceTaskTest {
             Schema.BYTES_SCHEMA,
             KAFKA_VALUE);
     assertRecordsEqual(expected, result.get(0));
+  }
+  
+  /**
+   * Tests that receiving multiple messages from Cloud Pub/Sub and activated sampling, receives only (roughly)
+   * the configured fraction
+   */
+  @Test
+  public void testPollWithSampling_all() throws Exception {
+    Map<String,String> samplingProps = new HashMap<>();
+    samplingProps.putAll(props);
+    samplingProps.put(CloudPubSubSourceConnector.KAFKA_MESSAGE_SAMPLING_CONFIG, "1");
+    task.start(samplingProps);
+    
+    Builder stubbedPullResponse = PullResponse.newBuilder();
+    for(int i=0; i<500; i++){
+      ReceivedMessage rm = createReceivedMessage(ACK_ID1 + i, CPS_MESSAGE, new HashMap<String, String>());
+      stubbedPullResponse.addReceivedMessages(rm);
+    }
+    
+    when(subscriber.pull(any(PullRequest.class)).get()).thenReturn(stubbedPullResponse.build());
+    verify(subscriber, never()).ackMessages(any(AcknowledgeRequest.class));
+    
+    List<SourceRecord> results = task.poll();
+    assertEquals(500, results.size());
+  }
+  
+  /**
+   * Tests that receiving multiple messages from Cloud Pub/Sub and activated sampling, receives only (roughly)
+   * the configured fraction
+   */
+  @Test
+  public void testPollWithSampling_fraction() throws Exception {
+    Map<String,String> samplingProps = new HashMap<>();
+    samplingProps.putAll(props);
+    samplingProps.put(CloudPubSubSourceConnector.KAFKA_MESSAGE_SAMPLING_CONFIG, "0.1");
+    task.start(samplingProps);
+    
+    Builder stubbedPullResponse = PullResponse.newBuilder();
+    for(int i=0; i<500; i++){
+      ReceivedMessage rm = createReceivedMessage(ACK_ID1 + i, CPS_MESSAGE, new HashMap<String, String>());
+      stubbedPullResponse.addReceivedMessages(rm);
+    }
+    
+    when(subscriber.pull(any(PullRequest.class)).get()).thenReturn(stubbedPullResponse.build());
+    verify(subscriber, never()).ackMessages(any(AcknowledgeRequest.class));
+    
+    List<SourceRecord> results = task.poll();
+    assertTrue(Math.abs(results.size() - 50) < 10);
   }
 
   /**
