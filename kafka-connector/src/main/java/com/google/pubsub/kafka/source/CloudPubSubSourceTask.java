@@ -41,6 +41,7 @@ import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.source.SourceTask;
+import org.apache.kafka.common.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -151,7 +152,9 @@ public class CloudPubSubSourceTask extends SourceTask {
         Long timestamp = parseMessageTimestampOrNull(messageAttributes);
         ByteString messageData = message.getData();
         byte[] messageBytes = messageData.toByteArray();
-        
+	byte[] keyBytes = null;
+	if (key != null) keyBytes = key.getBytes();
+
         // check if we have attributes apart from the kafka message key/timestamp
         boolean hasAttributes = messageAttributes.size()
             - (messageAttributes.containsKey(kafkaMessageKeyAttribute) ? 1 : 0)
@@ -165,7 +168,7 @@ public class CloudPubSubSourceTask extends SourceTask {
 
           for (Entry<String, String> attribute :
                messageAttributes.entrySet()) {
-            if (!attribute.getKey().equals(kafkaMessageKeyAttribute) 
+            if (!attribute.getKey().equals(kafkaMessageKeyAttribute)
             		&& !attribute.getKey().equals(kafkaMessageTimestampAttribute)) {
               valueSchemaBuilder.field(attribute.getKey(),
                                        Schema.STRING_SCHEMA);
@@ -188,7 +191,7 @@ public class CloudPubSubSourceTask extends SourceTask {
                 null,
                 null,
                 kafkaTopic,
-                selectPartition(key, value),
+                selectPartition(keyBytes, value),
                 Schema.OPTIONAL_STRING_SCHEMA,
                 key,
                 valueSchema,
@@ -200,7 +203,7 @@ public class CloudPubSubSourceTask extends SourceTask {
                 null,
                 null,
                 kafkaTopic,
-                selectPartition(key, messageBytes),
+                selectPartition(keyBytes, messageBytes),
                 Schema.OPTIONAL_STRING_SCHEMA,
                 key,
                 Schema.BYTES_SCHEMA,
@@ -246,9 +249,9 @@ public class CloudPubSubSourceTask extends SourceTask {
   }
 
   /** Return the partition a message should go to based on {@link #kafkaPartitionScheme}. */
-  private int selectPartition(Object key, Object value) {
+  private int selectPartition(byte[] key, Object value) {
     if (kafkaPartitionScheme.equals(PartitionScheme.HASH_KEY)) {
-      return key == null ? 0 : Math.abs(key.hashCode()) % kafkaPartitions;
+      return key == null ? 0 : Utils.toPositive(Utils.murmur2(key)) % kafkaPartitions;
     } else if (kafkaPartitionScheme.equals(PartitionScheme.HASH_VALUE)) {
       return Math.abs(value.hashCode()) % kafkaPartitions;
     } else {

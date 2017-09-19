@@ -43,6 +43,7 @@ import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.apache.kafka.common.utils.Utils;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -351,12 +352,13 @@ public class CloudPubSubSourceTaskTest {
     List<SourceRecord> result = task.poll();
     verify(subscriber, never()).ackMessages(any(AcknowledgeRequest.class));
     assertEquals(2, result.size());
+    int partition = Utils.toPositive(Utils.murmur2(KAFKA_MESSAGE_KEY_ATTRIBUTE_VALUE.getBytes())) % Integer.parseInt(KAFKA_PARTITIONS);
     SourceRecord expectedForMessageWithKey =
         new SourceRecord(
             null,
             null,
             KAFKA_TOPIC,
-            KAFKA_MESSAGE_KEY_ATTRIBUTE_VALUE.hashCode() % Integer.parseInt(KAFKA_PARTITIONS),
+            partition,
             Schema.OPTIONAL_STRING_SCHEMA,
             KAFKA_MESSAGE_KEY_ATTRIBUTE_VALUE,
             Schema.BYTES_SCHEMA,
