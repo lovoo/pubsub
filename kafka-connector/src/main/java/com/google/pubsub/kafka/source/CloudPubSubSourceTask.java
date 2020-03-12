@@ -158,9 +158,7 @@ public class CloudPubSubSourceTask extends SourceTask {
         byte[] messageBytes = messageData.toByteArray();
         
         // check if we have attributes apart from the kafka message key/timestamp
-        boolean hasAttributes = messageAttributes.size()
-            - (messageAttributes.containsKey(kafkaMessageKeyAttribute) ? 1 : 0)
-            - (messageAttributes.containsKey(kafkaMessageTimestampAttribute) ? 1 : 0) > 0;
+        boolean hasAttributes = false;
 
 	byte[] keyBytes = null;
 	if (key != null) keyBytes = key.getBytes();
